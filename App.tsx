@@ -2,7 +2,7 @@ import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { CutInfo, AiModel, HistoryItem } from './types';
 import { generateScenario } from './services/geminiService';
-import { PlusIcon, TrashIcon, CopyIcon, CheckIcon, SparklesIcon, RefreshIcon, HistoryIcon, UploadIcon } from './components/icons';
+import { PlusIcon, TrashIcon, CopyIcon, CheckIcon, SparklesIcon, RefreshIcon, UploadIcon } from './components/icons';
 import { useTranslation } from './i18n/LanguageContext';
 
 interface ParsedScenario {
@@ -56,14 +56,6 @@ const App: React.FC = () => {
     }
   }, [totalDuration, cuts.length]);
 
-  // Link main theme to all cut descriptions
-  useEffect(() => {
-    setCuts(currentCuts =>
-      currentCuts.map(cut => ({ ...cut, description: mainTheme }))
-    );
-  }, [mainTheme]);
-
-
   useEffect(() => {
     try {
         const savedHistory = localStorage.getItem('scenarioHistory');
@@ -75,13 +67,6 @@ const App: React.FC = () => {
         localStorage.removeItem('scenarioHistory');
     }
   }, []);
-
-  const updateHistory = (newHistory: HistoryItem[]) => {
-      const sortedHistory = newHistory.sort((a, b) => b.timestamp - a.timestamp);
-      setHistory(sortedHistory);
-      localStorage.setItem('scenarioHistory', JSON.stringify(sortedHistory));
-  };
-
 
   const handleAddCut = () => {
     setCuts([...cuts, { id: uuidv4(), duration: 0, description: mainTheme }]);
@@ -147,7 +132,11 @@ const App: React.FC = () => {
         language,
         generatedJson: result,
       };
-      updateHistory([newHistoryItem, ...history]);
+      setHistory(prevHistory => {
+        const newHistory = [newHistoryItem, ...prevHistory].sort((a,b) => b.timestamp - a.timestamp);
+        localStorage.setItem('scenarioHistory', JSON.stringify(newHistory));
+        return newHistory;
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : t('clientSideError'));
       console.error(err);
@@ -157,7 +146,7 @@ const App: React.FC = () => {
         outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  }, [projectTitle, mainTheme, totalDuration, cuts, model, language, history, t]);
+  }, [projectTitle, mainTheme, totalDuration, cuts, model, language, t]);
   
   const handleCopyCut = (cutData: any, cutNumber: number) => {
       const jsonString = JSON.stringify(cutData, null, 2);
@@ -199,13 +188,17 @@ const App: React.FC = () => {
   };
 
   const handleDeleteHistory = (id: string) => {
-      const newHistory = history.filter(h => h.id !== id);
-      updateHistory(newHistory);
+      setHistory(prevHistory => {
+        const newHistory = prevHistory.filter(h => h.id !== id);
+        localStorage.setItem('scenarioHistory', JSON.stringify(newHistory));
+        return newHistory;
+      });
   };
 
   const handleClearHistory = () => {
       if (window.confirm(t('confirmClearHistory'))) {
-          updateHistory([]);
+          setHistory([]);
+          localStorage.setItem('scenarioHistory', '[]');
       }
   };
 
@@ -226,13 +219,17 @@ const App: React.FC = () => {
           {/* History Section */}
           <div className="lg:col-span-3 bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col h-fit max-h-[calc(100vh-12rem)]">
               <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-semibold flex items-center gap-2">
-                      <HistoryIcon className="w-6 h-6" />
+                  <h2 className="text-2xl font-semibold">
                       {t('historyTitle')}
                   </h2>
                   {history.length > 0 && (
-                      <button onClick={handleClearHistory} className="text-sm text-red-400 hover:text-red-300 transition">
-                          {t('clearHistoryButton')}
+                      <button 
+                        onClick={handleClearHistory} 
+                        className="p-2 text-gray-400 hover:text-red-500 transition rounded-md hover:bg-red-500/10"
+                        aria-label={t('clearHistoryButton')}
+                        title={t('clearHistoryButton')}
+                      >
+                          <TrashIcon className="w-5 h-5" />
                       </button>
                   )}
               </div>
