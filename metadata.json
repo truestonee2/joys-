@@ -1,0 +1,5 @@
+{
+  "name": "Ecclesia Vision: AI Scenario Generator",
+  "description": "An AI-powered tool to generate structured JSON scenarios for video production based on biblical themes. Users input project details and scene information to create detailed prompts for AI video and audio generation models.",
+  "requestFramePermissions": []
+}
