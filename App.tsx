@@ -5,13 +5,28 @@ import { generateScenario } from './services/geminiService';
 import { PlusIcon, TrashIcon, CopyIcon, CheckIcon, SparklesIcon, RefreshIcon, UploadIcon } from './components/icons';
 import { useTranslation } from './i18n/LanguageContext';
 
+interface ParsedCut {
+  cut_number: number;
+  duration: number;
+  scene_details: {
+    shot_type: string;
+    visual_prompt: string;
+    camera_movement: string;
+  };
+  audio_details: {
+    narration_text: string;
+    narration_tone: string;
+    bgm_cue: string;
+  };
+}
+
 interface ParsedScenario {
   meta_data: {
     title: string;
     theme: string;
     total_duration: number;
   };
-  cuts: any[];
+  cuts: ParsedCut[];
 }
 
 const App: React.FC = () => {
@@ -22,7 +37,7 @@ const App: React.FC = () => {
   ]);
 
   const [projectTitle, setProjectTitle] = useState<string>("");
-  const [mainTheme, setMainTheme] = useState<string>("");
+  const [bibleVerse, setBibleVerse] = useState<string>("");
   const [totalDuration, setTotalDuration] = useState<string>(""); // Changed to string to allow empty and fix 0 deletion
   const [cuts, setCuts] = useState<CutInfo[]>(getInitialCuts());
   const [model, setModel] = useState<AiModel>('gemini-2.5-flash');
@@ -31,6 +46,8 @@ const App: React.FC = () => {
   const [parsedScenario, setParsedScenario] = useState<ParsedScenario | null>(null);
   const [error, setError] = useState<string>("");
   const [copiedCut, setCopiedCut] = useState<number | null>(null);
+  const [copiedJsonCut, setCopiedJsonCut] = useState<number | null>(null);
+  const [isMetaCopied, setIsMetaCopied] = useState(false);
   const [isFullJsonCopied, setIsFullJsonCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'breakdown' | 'json'>('breakdown');
   const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -39,7 +56,7 @@ const App: React.FC = () => {
   // Distribute total duration among cuts when total duration or number of cuts changes
   useEffect(() => {
     const numericTotalDuration = parseInt(totalDuration, 10) || 0;
-    if (cuts.length === 0) return;
+    if (cuts.length === 0 || numericTotalDuration <= 0) return;
 
     const baseDuration = Math.floor(numericTotalDuration / cuts.length);
     const remainder = numericTotalDuration % cuts.length;
@@ -54,7 +71,7 @@ const App: React.FC = () => {
     if (durationsChanged) {
         setCuts(newCutsWithDurations);
     }
-  }, [totalDuration, cuts.length]);
+  }, [totalDuration, cuts.length]); // Dependency changed to cuts.length
 
   useEffect(() => {
     try {
@@ -69,7 +86,7 @@ const App: React.FC = () => {
   }, []);
 
   const handleAddCut = () => {
-    setCuts([...cuts, { id: uuidv4(), duration: 0, description: mainTheme }]);
+    setCuts([...cuts, { id: uuidv4(), duration: 0, description: bibleVerse }]);
   };
 
   const handleRemoveCut = (id: string) => {
@@ -82,7 +99,7 @@ const App: React.FC = () => {
   
   const handleReset = () => {
     setProjectTitle("");
-    setMainTheme("");
+    setBibleVerse("");
     setTotalDuration("");
     setCuts(getInitialCuts());
     setModel('gemini-2.5-flash');
@@ -91,6 +108,8 @@ const App: React.FC = () => {
     setParsedScenario(null);
     setError("");
     setCopiedCut(null);
+    setCopiedJsonCut(null);
+    setIsMetaCopied(false);
     setIsFullJsonCopied(false);
     setActiveTab('breakdown');
   };
@@ -102,6 +121,8 @@ const App: React.FC = () => {
     setGeneratedJson("");
     setParsedScenario(null);
     setCopiedCut(null);
+    setCopiedJsonCut(null);
+    setIsMetaCopied(false);
     setIsFullJsonCopied(false);
     setActiveTab('breakdown');
 
@@ -110,7 +131,7 @@ const App: React.FC = () => {
     try {
       const result = await generateScenario({
         projectTitle,
-        mainTheme,
+        bibleVerse,
         totalDuration: numericTotalDuration,
         cuts,
         model,
@@ -125,7 +146,7 @@ const App: React.FC = () => {
         id: uuidv4(),
         timestamp: Date.now(),
         projectTitle,
-        mainTheme,
+        mainTheme: bibleVerse, // Keep mainTheme for history compatibility, but use bibleVerse
         totalDuration: numericTotalDuration,
         cuts,
         model,
@@ -146,7 +167,7 @@ const App: React.FC = () => {
         outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  }, [projectTitle, mainTheme, totalDuration, cuts, model, language, t]);
+  }, [projectTitle, bibleVerse, totalDuration, cuts, model, language, t]);
   
   const handleCopyCut = (cutData: any, cutNumber: number) => {
       const jsonString = JSON.stringify(cutData, null, 2);
@@ -161,13 +182,27 @@ const App: React.FC = () => {
     setIsFullJsonCopied(true);
     setTimeout(() => setIsFullJsonCopied(false), 2000);
   };
+  
+  const handleCopyCutJson = (cutData: any, cutNumber: number) => {
+    const jsonString = JSON.stringify(cutData, null, 2);
+    navigator.clipboard.writeText(jsonString);
+    setCopiedJsonCut(cutNumber);
+    setTimeout(() => setCopiedJsonCut(null), 2000);
+  };
+
+  const handleCopyMeta = () => {
+    if (!parsedScenario) return;
+    navigator.clipboard.writeText(JSON.stringify(parsedScenario.meta_data, null, 2));
+    setIsMetaCopied(true);
+    setTimeout(() => setIsMetaCopied(false), 2000);
+  };
 
 
   const handleLoadHistory = (id: string) => {
     const item = history.find(h => h.id === id);
     if (item) {
         setProjectTitle(item.projectTitle);
-        setMainTheme(item.mainTheme);
+        setBibleVerse(item.mainTheme); // Load mainTheme from history into bibleVerse
         setTotalDuration(String(item.totalDuration)); // Convert number to string for state
         setCuts(item.cuts);
         setModel(item.model);
@@ -181,6 +216,8 @@ const App: React.FC = () => {
         }
         setError("");
         setCopiedCut(null);
+        setCopiedJsonCut(null);
+        setIsMetaCopied(false);
         setIsFullJsonCopied(false);
         setActiveTab('breakdown');
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -210,8 +247,8 @@ const App: React.FC = () => {
           <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-indigo-600">{t('headerTitle')}</h1>
           <p className="text-lg text-gray-400 mt-2">{t('headerSubtitle')}</p>
            <div className="absolute top-0 right-0 flex space-x-1 bg-gray-800 p-1 rounded-lg border border-gray-700">
-             <button onClick={() => setLanguage('en')} className={`px-3 py-1 text-sm font-medium rounded-md transition ${language === 'en' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>EN</button>
-             <button onClick={() => setLanguage('ko')} className={`px-3 py-1 text-sm font-medium rounded-md transition ${language === 'ko' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>KO</button>
+             <button type="button" onClick={() => setLanguage('en')} className={`px-3 py-1 text-sm font-medium rounded-md transition ${language === 'en' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>EN</button>
+             <button type="button" onClick={() => setLanguage('ko')} className={`px-3 py-1 text-sm font-medium rounded-md transition ${language === 'ko' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:bg-gray-700'}`}>KO</button>
           </div>
         </header>
 
@@ -224,6 +261,7 @@ const App: React.FC = () => {
                   </h2>
                   {history.length > 0 && (
                       <button 
+                        type="button"
                         onClick={handleClearHistory} 
                         className="p-2 text-gray-400 hover:text-red-500 transition rounded-md hover:bg-red-500/10"
                         aria-label={t('clearHistoryButton')}
@@ -246,11 +284,11 @@ const App: React.FC = () => {
                                   {new Date(item.timestamp).toLocaleString(language === 'ko' ? 'ko-KR' : 'en-US')}
                               </p>
                               <div className="flex gap-2">
-                                  <button onClick={() => handleLoadHistory(item.id)} className="flex-1 flex items-center justify-center gap-1.5 text-sm py-1 px-2 bg-indigo-600 hover:bg-indigo-700 rounded transition text-white">
+                                  <button type="button" onClick={() => handleLoadHistory(item.id)} className="flex-1 flex items-center justify-center gap-1.5 text-sm py-1 px-2 bg-indigo-600 hover:bg-indigo-700 rounded transition text-white">
                                       <UploadIcon className="w-4 h-4" />
                                       {t('loadButton')}
                                   </button>
-                                  <button onClick={() => handleDeleteHistory(item.id)} className="p-2 text-gray-400 hover:text-red-500 transition rounded-md hover:bg-red-500/10">
+                                  <button type="button" onClick={() => handleDeleteHistory(item.id)} className="p-2 text-gray-400 hover:text-red-500 transition rounded-md hover:bg-red-500/10">
                                       <TrashIcon className="w-4 h-4" />
                                   </button>
                               </div>
@@ -275,8 +313,8 @@ const App: React.FC = () => {
                         <input type="text" id="projectTitle" value={projectTitle} onChange={(e) => setProjectTitle(e.target.value)} disabled={isLoading} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-70" />
                       </div>
                       <div>
-                        <label htmlFor="mainTheme" className="block text-sm font-medium text-gray-300 mb-1">{t('mainBiblicalTheme')}</label>
-                        <input type="text" id="mainTheme" value={mainTheme} onChange={(e) => setMainTheme(e.target.value)} disabled={isLoading} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-70" />
+                        <label htmlFor="bibleVerse" className="block text-sm font-medium text-gray-300 mb-1">{t('bibleVerse')}</label>
+                        <input type="text" id="bibleVerse" value={bibleVerse} onChange={(e) => setBibleVerse(e.target.value)} disabled={isLoading} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-70" />
                       </div>
                       <div>
                         <label htmlFor="totalDuration" className="block text-sm font-medium text-gray-300 mb-1">{t('totalDuration')}</label>
@@ -298,7 +336,7 @@ const App: React.FC = () => {
                             <div className="flex-1">
                               <label htmlFor={`cut-desc-${cut.id}`} className="block text-sm font-medium text-gray-300 mb-1">{t('descriptionAndKeywords')}</label>
                                <div className="relative">
-                                <textarea id={`cut-desc-${cut.id}`} value={cut.description} onChange={(e) => handleCutChange(cut.id, 'description', e.target.value)} rows={2} className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-gray-700 disabled:opacity-70 disabled:cursor-wait" placeholder={t('cutPlaceholder')} disabled={isLoading}></textarea>
+                                <textarea id={`cut-desc-${cut.id}`} value={cut.description} onChange={(e) => handleCutChange(cut.id, 'description', e.target.value)} rows={2} className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-gray-700 disabled:opacity-70 disabled:cursor-wait" placeholder={bibleVerse || t('cutPlaceholder')} disabled={isLoading}></textarea>
                                </div>
                             </div>
                             <div className="w-full sm:w-28">
@@ -360,8 +398,8 @@ const App: React.FC = () => {
             <div ref={outputRef} className="bg-gray-800 p-6 rounded-2xl shadow-lg border border-gray-700 flex flex-col h-full">
               <div className="flex justify-between items-center mb-4">
                   <h2 className="text-2xl font-semibold">{t('outputTitle')}</h2>
-                  {parsedScenario && (
-                     <button onClick={handleCopyFullJson} className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md text-sm transition ${isFullJsonCopied ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
+                  {generatedJson && (
+                     <button type="button" onClick={handleCopyFullJson} className={`flex items-center gap-1.5 py-1.5 px-3 rounded-md text-sm transition ${isFullJsonCopied ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
                         {isFullJsonCopied ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
                         {isFullJsonCopied ? t('copiedButton') : t('copyFullJsonButton')}
                       </button>
@@ -385,52 +423,75 @@ const App: React.FC = () => {
                     <p>{t('outputPlaceholder')}</p>
                   </div>
                 )}
-                {parsedScenario && parsedScenario.cuts && (
+                {parsedScenario && (
                   <>
                     <div className="flex border-b border-gray-700">
-                      <button onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${activeTab === 'breakdown' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700/50'}`}>
+                      <button type="button" onClick={() => setActiveTab('breakdown')} className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${activeTab === 'breakdown' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700/50'}`}>
                         {t('breakdownTab')}
                       </button>
-                      <button onClick={() => setActiveTab('json')} className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${activeTab === 'json' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700/50'}`}>
+                      <button type="button" onClick={() => setActiveTab('json')} className={`flex-1 py-2 px-4 text-sm font-medium transition-colors ${activeTab === 'json' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700/50'}`}>
                         {t('rawJsonTab')}
                       </button>
                     </div>
 
-                    <div className="p-2 space-y-2 overflow-y-auto flex-grow">
-                      {activeTab === 'breakdown' && parsedScenario.cuts.map((cut, index) => (
-                        <div key={index} className="bg-gray-800 rounded-lg border border-gray-700">
-                            <div className="flex justify-between items-center p-3 bg-gray-700/50 rounded-t-lg">
-                              <h4 className="font-bold text-indigo-300">{t('cutScenarioTitle', { cut_number: cut.cut_number })}</h4>
-                              <button onClick={() => handleCopyCut(cut, cut.cut_number)} className={`flex items-center gap-1.5 py-1 px-3 rounded-md text-xs transition ${copiedCut === cut.cut_number ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
-                                {copiedCut === cut.cut_number ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
-                                {copiedCut === cut.cut_number ? t('cutCopiedButton') : t('copyCutButton')}
-                              </button>
+                    <div className="flex-grow overflow-y-auto">
+                      {activeTab === 'breakdown' && (
+                        <div className="p-2 space-y-2">
+                          {parsedScenario.cuts.map((cut, index) => (
+                            <div key={index} className="bg-gray-800 rounded-lg border border-gray-700">
+                                <div className="flex justify-between items-center p-3 bg-gray-700/50 rounded-t-lg">
+                                  <h4 className="font-bold text-indigo-300">{t('cutScenarioTitle', { cut_number: cut.cut_number })}</h4>
+                                  <button type="button" onClick={() => handleCopyCut(cut, cut.cut_number)} className={`flex items-center gap-1.5 py-1 px-3 rounded-md text-xs transition ${copiedCut === cut.cut_number ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
+                                    {copiedCut === cut.cut_number ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
+                                    {copiedCut === cut.cut_number ? t('cutCopiedButton') : t('copyCutButton')}
+                                  </button>
+                                </div>
+                                <div className="p-3 text-sm text-gray-300 space-y-2">
+                                  <p><strong className="font-medium text-gray-100">Visual Prompt:</strong> <span className="text-cyan-300 font-mono break-words whitespace-pre-wrap">{cut.scene_details?.visual_prompt}</span></p>
+                                  <p><strong className="font-medium text-gray-100">Narration Text:</strong> {cut.audio_details?.narration_text}</p>
+                                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1 text-xs">
+                                      <p><strong className="text-gray-400">Duration:</strong> {cut.duration}s</p>
+                                      <p><strong className="text-gray-400">Shot Type:</strong> {cut.scene_details?.shot_type}</p>
+                                      <p><strong className="text-gray-400">Camera:</strong> {cut.scene_details?.camera_movement}</p>
+                                      <p><strong className="text-gray-400">Narration Tone:</strong> {cut.audio_details?.narration_tone}</p>
+                                      <p><strong className="text-gray-400">BGM Cue:</strong> {cut.audio_details?.bgm_cue}</p>
+                                  </div>
+                                </div>
                             </div>
-                            <div className="p-3 text-sm text-gray-300 space-y-2">
-                              <p><strong className="font-medium text-gray-100">Visual Prompt:</strong> <span className="text-cyan-300 font-mono break-words whitespace-pre-wrap">{cut.visual_prompt}</span></p>
-                              <p><strong className="font-medium text-gray-100">Narration Text:</strong> {cut.narration_text}</p>
-                               <div className="grid grid-cols-2 gap-x-4 gap-y-1 pt-1 text-xs">
-                                  <p><strong className="text-gray-400">Duration:</strong> {cut.duration}s</p>
-                                  <p><strong className="text-gray-400">Shot Type:</strong> {cut.shot_type}</p>
-                                  <p><strong className="text-gray-400">Camera:</strong> {cut.camera_movement}</p>
-                                  <p><strong className="text-gray-400">Narration Tone:</strong> {cut.narration_tone}</p>
-                                  <p><strong className="text-gray-400">BGM Cue:</strong> {cut.bgm_cue}</p>
-                              </div>
-                            </div>
+                          ))}
                         </div>
-                      ))}
-                      {activeTab === 'json' && parsedScenario.cuts.map((cut, index) => (
-                         <div key={index} className="bg-gray-800 rounded-lg border border-gray-700">
-                           <div className="flex justify-between items-center p-3 bg-gray-700/50 rounded-t-lg">
-                              <h4 className="font-bold text-indigo-300">{t('cutScenarioTitle', { cut_number: cut.cut_number })}</h4>
-                              <button onClick={() => handleCopyCut(cut, cut.cut_number)} className={`flex items-center gap-1.5 py-1 px-3 rounded-md text-xs transition ${copiedCut === cut.cut_number ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
-                                {copiedCut === cut.cut_number ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
-                                {copiedCut === cut.cut_number ? t('cutCopiedButton') : t('copyCutJsonButton')}
-                              </button>
+                      )}
+                      {activeTab === 'json' && (
+                         <div className="p-2 space-y-2">
+                            <div className="bg-gray-800 rounded-lg border border-gray-700">
+                                <div className="flex justify-between items-center p-3 bg-gray-700/50 rounded-t-lg">
+                                <h4 className="font-bold text-indigo-300">{t('metaDataTitle')}</h4>
+                                <button type="button" onClick={handleCopyMeta} className={`flex items-center gap-1.5 py-1 px-3 rounded-md text-xs transition ${isMetaCopied ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
+                                    {isMetaCopied ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
+                                    {isMetaCopied ? t('copiedButton') : t('copyButton')}
+                                </button>
+                                </div>
+                                <pre className="p-4 text-sm text-cyan-300 bg-transparent rounded-b-lg overflow-x-auto">
+                                <code>{JSON.stringify(parsedScenario.meta_data, null, 2)}</code>
+                                </pre>
                             </div>
-                            <pre className="p-3 text-sm text-cyan-300 bg-gray-900 rounded-b-lg overflow-x-auto"><code>{JSON.stringify(cut, null, 2)}</code></pre>
-                         </div>
-                      ))}
+
+                            {parsedScenario.cuts.map((cut, index) => (
+                                <div key={index} className="bg-gray-800 rounded-lg border border-gray-700">
+                                <div className="flex justify-between items-center p-3 bg-gray-700/50 rounded-t-lg">
+                                    <h4 className="font-bold text-indigo-300">{t('cutScenarioTitle', { cut_number: cut.cut_number })} JSON</h4>
+                                    <button type="button" onClick={() => handleCopyCutJson(cut, cut.cut_number)} className={`flex items-center gap-1.5 py-1 px-3 rounded-md text-xs transition ${copiedJsonCut === cut.cut_number ? 'bg-green-600 text-white' : 'bg-gray-600 hover:bg-gray-500 text-gray-200'}`}>
+                                    {copiedJsonCut === cut.cut_number ? <CheckIcon className="w-4 h-4"/> : <CopyIcon className="w-4 h-4"/>}
+                                    {copiedJsonCut === cut.cut_number ? t('cutCopiedButton') : t('copyCutJsonButton')}
+                                    </button>
+                                </div>
+                                <pre className="p-4 text-sm text-cyan-300 bg-transparent rounded-b-lg overflow-x-auto">
+                                    <code>{JSON.stringify(cut, null, 2)}</code>
+                                </pre>
+                                </div>
+                            ))}
+                        </div>
+                      )}
                     </div>
                   </>
                 )}

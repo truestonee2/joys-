@@ -7,7 +7,7 @@ export const translations = {
     // Project Details
     projectDetails: "Project Details",
     projectTitle: "Project Title",
-    mainBiblicalTheme: "Main Biblical Theme",
+    bibleVerse: "Bible Verse",
     totalDuration: "Total Duration (seconds)",
 
     // Scene Cuts
@@ -15,7 +15,7 @@ export const translations = {
     descriptionAndKeywords: "Description & Keywords",
     durationSeconds: "Duration (s)",
     addSceneCut: "Add Scene Cut",
-    cutPlaceholder: "The main theme will be automatically entered here.",
+    cutPlaceholder: "The Bible verse will be automatically entered here.",
 
     // Configuration
     configuration: "Configuration",
@@ -30,6 +30,7 @@ export const translations = {
 
     // Output Section
     outputTitle: "Generated Scenario",
+    copyButton: "Copy",
     copiedButton: "Copied!",
     outputPlaceholder: "Your generated scenario will appear here.",
     errorOccurred: "An error occurred:",
@@ -46,6 +47,7 @@ export const translations = {
     rawJsonTab: "Raw JSON",
     copyFullJsonButton: "Copy Full JSON",
     copyCutJsonButton: "Copy Cut JSON",
+    metaDataTitle: "Meta Data",
 
 
     // History
@@ -63,7 +65,7 @@ export const translations = {
     // Project Details
     projectDetails: "프로젝트 상세정보",
     projectTitle: "프로젝트 제목",
-    mainBiblicalTheme: "핵심 성경 테마",
+    bibleVerse: "성경 구절",
     totalDuration: "총 길이 (초)",
 
     // Scene Cuts
@@ -71,7 +73,7 @@ export const translations = {
     descriptionAndKeywords: "설명 및 키워드",
     durationSeconds: "길이 (초)",
     addSceneCut: "장면 컷 추가",
-    cutPlaceholder: "핵심 성경 테마가 여기에 자동으로 입력됩니다.",
+    cutPlaceholder: "성경 구절이 여기에 자동으로 입력됩니다.",
 
     // Configuration
     configuration: "설정",
@@ -86,6 +88,7 @@ export const translations = {
 
     // Output Section
     outputTitle: "생성된 시나리오",
+    copyButton: "복사",
     copiedButton: "복사됨!",
     outputPlaceholder: "생성된 시나리오가 여기에 표시됩니다.",
     errorOccurred: "오류가 발생했습니다:",
@@ -102,6 +105,7 @@ export const translations = {
     rawJsonTab: "JSON 원본",
     copyFullJsonButton: "전체 JSON 복사",
     copyCutJsonButton: "컷 JSON 복사",
+    metaDataTitle: "메타 데이터",
 
     // History
     historyTitle: "생성 기록",

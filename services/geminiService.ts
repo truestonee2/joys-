@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { AiModel, CutInfo, Language } from '../types';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,7 +11,7 @@ const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 interface GenerationParams {
   projectTitle: string;
-  mainTheme: string;
+  bibleVerse: string;
   totalDuration: number;
   cuts: CutInfo[];
   model: AiModel;
@@ -26,64 +26,97 @@ const cleanJsonString = (rawText: string): string => {
   return rawText.trim();
 };
 
+const responseSchema = {
+    type: Type.OBJECT,
+    properties: {
+        project_id: { type: Type.STRING },
+        meta_data: {
+            type: Type.OBJECT,
+            properties: {
+                title: { type: Type.STRING },
+                theme: { type: Type.STRING },
+                total_duration: { type: Type.NUMBER },
+                visual_style: { type: Type.STRING },
+                audio_profile: { type: Type.STRING },
+            },
+            required: ["title", "theme", "total_duration", "visual_style", "audio_profile"]
+        },
+        cuts: {
+            type: Type.ARRAY,
+            items: {
+                type: Type.OBJECT,
+                properties: {
+                    cut_number: { type: Type.NUMBER },
+                    duration: { type: Type.NUMBER },
+                    scene_details: {
+                        type: Type.OBJECT,
+                        properties: {
+                            shot_type: { type: Type.STRING },
+                            visual_prompt: { type: Type.STRING },
+                            camera_movement: { type: Type.STRING },
+                        },
+                        required: ["shot_type", "visual_prompt", "camera_movement"]
+                    },
+                    audio_details: {
+                        type: Type.OBJECT,
+                        properties: {
+                            narration_text: { type: Type.STRING },
+                            narration_tone: { type: Type.STRING },
+                            bgm_cue: { type: Type.STRING },
+                        },
+                        required: ["narration_text", "narration_tone", "bgm_cue"]
+                    },
+                },
+                required: ["cut_number", "duration", "scene_details", "audio_details"]
+            }
+        }
+    },
+    required: ["project_id", "meta_data", "cuts"]
+};
+
 
 export const generateScenario = async ({
   projectTitle,
-  mainTheme,
+  bibleVerse,
   totalDuration,
   cuts,
   model,
   language,
 }: GenerationParams): Promise<string> => {
   
-  const systemInstruction = `You are an AI scenario creation expert dedicated to assisting faithful servants of Jehovah and God in producing short-form biblical videos. Your mission is to create a fully structured JSON template based on user-provided key information, which can be directly input into modern AI video generation models like Sora/Runway and TTS/BGM models like Suno.
-* You must strictly follow the final JSON template structure presented below.
-* The output must contain ONLY the JSON code block, with no explanations or extra text.
-* **To maximize the animation and visual effects, imagine the characters are being portrayed by world-class, Oscar-winning actors and voiced by legendary dubbing champions. Describe their actions, expressions, and the scene's atmosphere with this level of dramatic and emotional intensity.**
-* For each cut, the 'visual_prompt' must be a highly detailed, cinematic description in English. It should expand on the user's keywords to paint a vivid picture. Specifically include: **1. Camera work:** (e.g., 'Medium shot, slow dolly in', 'Extreme close-up on tearful eyes'). **2. Lighting:** (e.g., 'dramatic Rembrandt lighting with deep shadows', 'soft morning light filtering through olive trees'). **3. Character Details:** (e.g., 'Jesus' face etched with agony and determination', 'disciples in deep, troubled sleep'). **4. Atmosphere:** (e.g., 'oppressive, silent tension', 'a sense of divine sacrifice'). Maintain the historical context of 1st century Judea and the requested Chiaroscuro visual style.
-* The **narration_text** must be logically mapped to the emotion of the text. **narration_tone** and **bgm_cue**.`;
+  const systemInstruction = `You are an expert AI scenario writer for 'Ecclesia Vision', specializing in transforming Bible scriptures into compelling short-form video scripts. Your knowledge base is aligned with the perspectives and scholarly materials found on jw.org. Your primary goal is to generate a structured JSON output that can be directly used by AI video and audio generation tools.
+
+Key Directives:
+1.  **JSON Exclusivity:** Your entire response MUST be a single, valid JSON object enclosed in \`\`\`json ... \`\`\`. Do not include any explanatory text, greetings, or apologies outside the JSON block.
+2.  **Narrative Flow:** Logically deconstruct the user-provided Bible verse into a cohesive narrative arc distributed across the specified number of cuts. Each cut should represent a distinct moment or aspect of the verse's message. The user provides keywords for each cut, which you must expand upon.
+3.  **Cinematic Visuals:** For each \`visual_prompt\`, you must create a vivid, dynamic, and emotionally resonant scene. Think like a film director. Describe camera work (e.g., 'dramatic slow push-in,' 'sweeping aerial shot'), lighting (e.g., 'golden hour light streaming through clouds,' 'stark, high-contrast shadows'), character emotions ('a face filled with serene understanding,' 'eyes widening in awe'), and atmospheric details.
+4.  **Content Integrity:** Ensure the narration, tone, and visual descriptions are theologically consistent with the interpretations found on jw.org.
+5.  **Dynamic Action:** Incorporate movement and action into the visual prompts to make the scenes engaging. For example, instead of 'a person standing', describe 'a person walking purposefully, their robes billowing in the wind'.
+6.  **Narration:** The \`narration_text\` should be directly inspired by or quoted from the relevant part of the Bible verse corresponding to that cut. Adjust the text for clarity and impact in the target language.
+7.  **JSON Structure:** For each cut, group visual elements (\`shot_type\`, \`visual_prompt\`, \`camera_movement\`) under a \`scene_details\` object, and audio elements (\`narration_text\`, \`narration_tone\`, \`bgm_cue\`) under an \`audio_details\` object.`;
 
   const cutInformationList = cuts
     .map((cut, index) => {
       if (language === 'ko') {
-        return `${index + 1}컷: ${cut.duration}초, '${cut.description.replace(/,/g, "', '")}'`;
+        return `${index + 1}컷: ${cut.duration}초, 키워드: '${cut.description.replace(/,/g, "', '")}'`;
       }
-      return `Cut ${index + 1}: ${cut.duration}s, '${cut.description.replace(/,/g, "', '")}'`;
+      return `Cut ${index + 1}: ${cut.duration}s, Keywords: '${cut.description.replace(/,/g, "', '")}'`;
     })
     .join('\n');
 
   const prompt = `
-Generate the final JSON template for the 'Ecclesia Vision' master protocol using the following information:
-- Project Title: ${projectTitle}
-- Main Theme: ${mainTheme}
-- Total Length: ${totalDuration} seconds
-- Cut Information List:
+Generate a complete JSON scenario based on the 'Ecclesia Vision' protocol.
+
+**Core Information:**
+- Project Title: "${projectTitle}"
+- Bible Verse: "${bibleVerse}"
+- Total Video Length: ${totalDuration} seconds
+- Language for Narration: ${language === 'ko' ? 'Korean' : 'English'}
+
+**Scene Structure (distribute the narrative of the verse across these cuts based on the provided keywords):**
 ${cutInformationList}
 
-The output MUST be in this exact JSON structure:
-{
-  "project_id": "[Automatically_generated_ID]",
-  "meta_data": {
-    "title": "${projectTitle}",
-    "theme": "${mainTheme}",
-    "total_duration": ${totalDuration},
-    "visual_style": "Rembrandt-style Chiaroscuro contrast",
-    "audio_profile": "Male, middle-aged, trustworthy"
-  },
-  "cuts": [
-    {
-      "cut_number": 1,
-      "duration": "[Cut_Duration_From_Input]",
-      "shot_type": "[Automatic_selection: ECU, CU, MS, WS]",
-      "visual_prompt": "[Based on the cut's keywords, create a detailed, cinematic visual prompt here. Include camera angle, lighting, character expressions, and overall atmosphere as per system instructions.]",
-      "camera_movement": "[Scene_Appropriate_Movement_e.g.,_Slow_Zoom-out]",
-      "narration_text": "[user_input_narration]",
-      "narration_tone": "[Emotion_Fitting_Narration:_Solemn,_Warning,_Calm,_Confident,_etc.]",
-      "bgm_cue": "[Emotion_Fitting_Mapping:_Monotone_Drone,_Hopeful_Melody,_etc.]"
-    }
-    // ... other cuts
-  ]
-}
+Adhere strictly to the system instructions and the required JSON schema to create the final output. The 'theme' in meta_data should be the Bible Verse.
 `;
 
   try {
@@ -92,8 +125,10 @@ The output MUST be in this exact JSON structure:
       contents: prompt,
       config: {
         systemInstruction: systemInstruction,
-        temperature: 0.1,
-        maxOutputTokens: 4096,
+        temperature: 0.2,
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json",
+        responseSchema: responseSchema,
       },
     });
 
