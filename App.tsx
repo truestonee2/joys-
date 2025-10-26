@@ -32,14 +32,10 @@ interface ParsedScenario {
 const App: React.FC = () => {
   const { language, setLanguage, t } = useTranslation();
 
-  const getInitialCuts = (): CutInfo[] => ([
-    { id: uuidv4(), duration: 0, description: "" },
-  ]);
-
   const [projectTitle, setProjectTitle] = useState<string>("");
   const [bibleVerse, setBibleVerse] = useState<string>("");
-  const [totalDuration, setTotalDuration] = useState<string>(""); // Changed to string to allow empty and fix 0 deletion
-  const [cuts, setCuts] = useState<CutInfo[]>(getInitialCuts());
+  const [totalDuration, setTotalDuration] = useState<string>("");
+  const [cutDuration, setCutDuration] = useState<string>("");
   const [model, setModel] = useState<AiModel>('gemini-2.5-flash');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [generatedJson, setGeneratedJson] = useState<string>("");
@@ -53,26 +49,6 @@ const App: React.FC = () => {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const outputRef = useRef<HTMLDivElement>(null);
   
-  // Distribute total duration among cuts when total duration or number of cuts changes
-  useEffect(() => {
-    const numericTotalDuration = parseInt(totalDuration, 10) || 0;
-    if (cuts.length === 0 || numericTotalDuration <= 0) return;
-
-    const baseDuration = Math.floor(numericTotalDuration / cuts.length);
-    const remainder = numericTotalDuration % cuts.length;
-
-    const newCutsWithDurations = cuts.map((cut, index) => ({
-        ...cut,
-        duration: baseDuration + (index < remainder ? 1 : 0),
-    }));
-    
-    const durationsChanged = cuts.some((cut, index) => cut.duration !== newCutsWithDurations[index].duration);
-
-    if (durationsChanged) {
-        setCuts(newCutsWithDurations);
-    }
-  }, [totalDuration, cuts.length]); // Dependency changed to cuts.length
-
   useEffect(() => {
     try {
         const savedHistory = localStorage.getItem('scenarioHistory');
@@ -85,23 +61,11 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const handleAddCut = () => {
-    setCuts([...cuts, { id: uuidv4(), duration: 0, description: bibleVerse }]);
-  };
-
-  const handleRemoveCut = (id: string) => {
-    setCuts(cuts.filter(cut => cut.id !== id));
-  };
-
-  const handleCutChange = (id: string, field: 'description', value: string) => {
-    setCuts(cuts.map(cut => cut.id === id ? { ...cut, [field]: value } : cut));
-  };
-  
   const handleReset = () => {
     setProjectTitle("");
     setBibleVerse("");
     setTotalDuration("");
-    setCuts(getInitialCuts());
+    setCutDuration("");
     setModel('gemini-2.5-flash');
     setIsLoading(false);
     setGeneratedJson("");
@@ -127,13 +91,37 @@ const App: React.FC = () => {
     setActiveTab('breakdown');
 
     const numericTotalDuration = parseInt(totalDuration, 10) || 0;
+    const numericCutDuration = parseInt(cutDuration, 10) || 0;
+
+    if (numericTotalDuration <= 0 || numericCutDuration <= 0) {
+        setError(t('durationError'));
+        setIsLoading(false);
+        return;
+    }
+
+    const numberOfCuts = Math.floor(numericTotalDuration / numericCutDuration);
+    const remainder = numericTotalDuration % numericCutDuration;
+
+    const generatedCuts: CutInfo[] = [];
+    for (let i = 0; i < numberOfCuts; i++) {
+        generatedCuts.push({ id: uuidv4(), duration: numericCutDuration, description: bibleVerse });
+    }
+    if (remainder > 0) {
+        generatedCuts.push({ id: uuidv4(), duration: remainder, description: bibleVerse });
+    }
+    
+    if (generatedCuts.length === 0) {
+        setError(t('noCutsError'));
+        setIsLoading(false);
+        return;
+    }
 
     try {
       const result = await generateScenario({
         projectTitle,
         bibleVerse,
         totalDuration: numericTotalDuration,
-        cuts,
+        cuts: generatedCuts,
         model,
         language,
       });
@@ -146,9 +134,9 @@ const App: React.FC = () => {
         id: uuidv4(),
         timestamp: Date.now(),
         projectTitle,
-        mainTheme: bibleVerse, // Keep mainTheme for history compatibility, but use bibleVerse
+        mainTheme: bibleVerse,
         totalDuration: numericTotalDuration,
-        cuts,
+        cutDuration: numericCutDuration,
         model,
         language,
         generatedJson: result,
@@ -167,7 +155,7 @@ const App: React.FC = () => {
         outputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  }, [projectTitle, bibleVerse, totalDuration, cuts, model, language, t]);
+  }, [projectTitle, bibleVerse, totalDuration, cutDuration, model, language, t]);
   
   const handleCopyCut = (cutData: any, cutNumber: number) => {
       const jsonString = JSON.stringify(cutData, null, 2);
@@ -202,9 +190,9 @@ const App: React.FC = () => {
     const item = history.find(h => h.id === id);
     if (item) {
         setProjectTitle(item.projectTitle);
-        setBibleVerse(item.mainTheme); // Load mainTheme from history into bibleVerse
-        setTotalDuration(String(item.totalDuration)); // Convert number to string for state
-        setCuts(item.cuts);
+        setBibleVerse(item.mainTheme);
+        setTotalDuration(String(item.totalDuration));
+        setCutDuration(String(item.cutDuration));
         setModel(item.model);
         setLanguage(item.language);
         setGeneratedJson(item.generatedJson);
@@ -320,42 +308,10 @@ const App: React.FC = () => {
                         <label htmlFor="totalDuration" className="block text-sm font-medium text-gray-300 mb-1">{t('totalDuration')}</label>
                         <input type="number" id="totalDuration" value={totalDuration} onChange={(e) => setTotalDuration(e.target.value)} disabled={isLoading} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-70" />
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Cuts Section */}
-                  <div>
-                    <div className="flex justify-between items-center mb-4 border-b-2 border-indigo-500 pb-2">
-                        <h2 className="text-2xl font-semibold">{t('sceneCuts')}</h2>
-                    </div>
-                    <div className="space-y-4">
-                      {cuts.map((cut, index) => (
-                        <div key={cut.id} className="bg-gray-700 p-4 rounded-lg border border-gray-600 relative">
-                          <span className="absolute -top-2 -left-2 bg-indigo-500 text-white text-xs font-bold px-2 py-1 rounded-full">{index + 1}</span>
-                          <div className="flex flex-col sm:flex-row gap-4">
-                            <div className="flex-1">
-                              <label htmlFor={`cut-desc-${cut.id}`} className="block text-sm font-medium text-gray-300 mb-1">{t('descriptionAndKeywords')}</label>
-                               <div className="relative">
-                                <textarea id={`cut-desc-${cut.id}`} value={cut.description} onChange={(e) => handleCutChange(cut.id, 'description', e.target.value)} rows={2} className="w-full bg-gray-600 border border-gray-500 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:bg-gray-700 disabled:opacity-70 disabled:cursor-wait" placeholder={bibleVerse || t('cutPlaceholder')} disabled={isLoading}></textarea>
-                               </div>
-                            </div>
-                            <div className="w-full sm:w-28">
-                              <label htmlFor={`cut-dur-${cut.id}`} className="block text-sm font-medium text-gray-300 mb-1">{t('durationSeconds')}</label>
-                              <input type="number" id={`cut-dur-${cut.id}`} value={cut.duration} readOnly className="w-full bg-gray-800 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition cursor-default" />
-                            </div>
-                            {cuts.length > 1 && (
-                              <div className="flex items-end">
-                                <button type="button" onClick={() => handleRemoveCut(cut.id)} disabled={isLoading} className="p-2 text-gray-400 hover:text-red-500 transition rounded-full hover:bg-red-500/10 disabled:opacity-50 disabled:cursor-not-allowed">
-                                  <TrashIcon className="w-5 h-5"/>
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                      <button type="button" onClick={handleAddCut} disabled={isLoading} className="w-full flex items-center justify-center gap-2 py-2 px-4 border-2 border-dashed border-gray-600 rounded-lg text-gray-400 hover:bg-gray-700 hover:border-gray-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        <PlusIcon className="w-5 h-5"/> {t('addSceneCut')}
-                      </button>
+                       <div>
+                        <label htmlFor="cutDuration" className="block text-sm font-medium text-gray-300 mb-1">{t('durationPerCut')}</label>
+                        <input type="number" id="cutDuration" value={cutDuration} onChange={(e) => setCutDuration(e.target.value)} disabled={isLoading} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition disabled:opacity-70" />
+                      </div>
                     </div>
                   </div>
 

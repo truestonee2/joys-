@@ -9,13 +9,7 @@ export const translations = {
     projectTitle: "Project Title",
     bibleVerse: "Bible Verse",
     totalDuration: "Total Duration (seconds)",
-
-    // Scene Cuts
-    sceneCuts: "Scene Cuts",
-    descriptionAndKeywords: "Description & Keywords",
-    durationSeconds: "Duration (s)",
-    addSceneCut: "Add Scene Cut",
-    cutPlaceholder: "The Bible verse will be automatically entered here.",
+    durationPerCut: "Duration per Cut (seconds)",
 
     // Configuration
     configuration: "Configuration",
@@ -38,7 +32,8 @@ export const translations = {
     jsonParseError: "Error: Could not parse the JSON response from the AI.",
     clientSideError: "An unexpected client-side error occurred.",
     aiCutGenerationError: "Failed to get suggestions from AI. Please try again.",
-    addCutFirstError: "Please add at least one scene cut before generating descriptions.",
+    durationError: "Total duration and duration per cut must be greater than 0.",
+    noCutsError: "Could not generate any cuts. Please check your duration inputs.",
     scenarioBreakdown: "Scenario Breakdown",
     cutScenarioTitle: "Cut {cut_number}",
     copyCutButton: "Copy Cut",
@@ -67,13 +62,7 @@ export const translations = {
     projectTitle: "프로젝트 제목",
     bibleVerse: "성경 구절",
     totalDuration: "총 길이 (초)",
-
-    // Scene Cuts
-    sceneCuts: "장면 컷",
-    descriptionAndKeywords: "설명 및 키워드",
-    durationSeconds: "길이 (초)",
-    addSceneCut: "장면 컷 추가",
-    cutPlaceholder: "성경 구절이 여기에 자동으로 입력됩니다.",
+    durationPerCut: "컷당 길이 (초)",
 
     // Configuration
     configuration: "설정",
@@ -96,7 +85,8 @@ export const translations = {
     jsonParseError: "오류: AI의 JSON 응답을 분석할 수 없습니다.",
     clientSideError: "예상치 못한 클라이언트 오류가 발생했습니다.",
     aiCutGenerationError: "AI로부터 장면 컷 제안을 받지 못했습니다. 다시 시도해주세요.",
-    addCutFirstError: "설명을 생성하기 전에 먼저 장면 컷을 하나 이상 추가해주세요.",
+    durationError: "총 길이와 컷당 길이는 0보다 커야 합니다.",
+    noCutsError: "컷을 생성할 수 없습니다. 길이 입력을 확인해주세요.",
     scenarioBreakdown: "시나리오 분석",
     cutScenarioTitle: "컷 {cut_number}",
     copyCutButton: "컷 복사",

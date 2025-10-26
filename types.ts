@@ -14,7 +14,7 @@ export interface HistoryItem {
   projectTitle: string;
   mainTheme: string;
   totalDuration: number;
-  cuts: CutInfo[];
+  cutDuration: number;
   model: AiModel;
   language: Language;
   generatedJson: string;

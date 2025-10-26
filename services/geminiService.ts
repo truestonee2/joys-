@@ -95,15 +95,6 @@ Key Directives:
 6.  **Narration:** The \`narration_text\` should be directly inspired by or quoted from the relevant part of the Bible verse corresponding to that cut. Adjust the text for clarity and impact in the target language.
 7.  **JSON Structure:** For each cut, group visual elements (\`shot_type\`, \`visual_prompt\`, \`camera_movement\`) under a \`scene_details\` object, and audio elements (\`narration_text\`, \`narration_tone\`, \`bgm_cue\`) under an \`audio_details\` object.`;
 
-  const cutInformationList = cuts
-    .map((cut, index) => {
-      if (language === 'ko') {
-        return `${index + 1}컷: ${cut.duration}초, 키워드: '${cut.description.replace(/,/g, "', '")}'`;
-      }
-      return `Cut ${index + 1}: ${cut.duration}s, Keywords: '${cut.description.replace(/,/g, "', '")}'`;
-    })
-    .join('\n');
-
   const prompt = `
 Generate a complete JSON scenario based on the 'Ecclesia Vision' protocol.
 
@@ -113,8 +104,11 @@ Generate a complete JSON scenario based on the 'Ecclesia Vision' protocol.
 - Total Video Length: ${totalDuration} seconds
 - Language for Narration: ${language === 'ko' ? 'Korean' : 'English'}
 
-**Scene Structure (distribute the narrative of the verse across these cuts based on the provided keywords):**
-${cutInformationList}
+**Scene Structure:**
+- Total number of cuts: ${cuts.length}
+- Duration per cut: Approximately ${cuts[0]?.duration || (totalDuration / (cuts.length || 1)).toFixed(1)} seconds.
+
+Your task is to logically divide the narrative of the provided Bible verse across the ${cuts.length} cuts. Create a cohesive story arc. You do not have specific keywords for each cut, so you must creatively interpret the verse to build the scene-by-scene progression.
 
 Adhere strictly to the system instructions and the required JSON schema to create the final output. The 'theme' in meta_data should be the Bible Verse.
 `;
